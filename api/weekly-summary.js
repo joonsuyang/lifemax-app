@@ -64,19 +64,18 @@ export default async function handler(req, res) {
 
     // ── 4. Call Anthropic ─────────────────────────────────────────────────────
     const prompt =
-      `You are summarizing a user's last 7 days of personal tasks in a to-do tracker. Here is their task data:\n\n` +
+      `You are a thoughtful assistant looking at a user's last 7 days of personal tasks. Here is their data:\n\n` +
       `${tasksJson}\n\n` +
       `Generate a response in this EXACT JSON format:\n` +
       `{\n` +
-      `  "summary": "<25 words or less, factual, second-person. Mention top categories, total hours spent, and completion patterns. No fluff or motivational language.>",\n` +
+      `  "summary": "<25 words or less, warm and personal, second-person ('you'). Observe what they invested time in, what categories they skipped, and what's left incomplete. Nudge them toward a balanced next step. Avoid generic motivational filler like 'great job' or 'keep crushing it' — instead be specific about what they actually did. Example tone: 'You\\'ve invested the most time in fitness this week — nice. Notice there\\'s no social on the list and a couple of errands sitting incomplete.'>",\n` +
       `  "suggestions": [\n` +
       `    "<short task suggestion 1, max 8 words>",\n` +
       `    "<short task suggestion 2, max 8 words>",\n` +
       `    "<short task suggestion 3, max 8 words>"\n` +
       `  ]\n` +
       `}\n\n` +
-      `Suggestions should be tasks the user might want to add based on gaps in their recent activity ` +
-      `(e.g., if they did chest day but not back day; if they did errands but no social tasks). Be concrete.\n\n` +
+      `Suggestions should reflect gaps in recent activity — if a category is empty or underweighted, suggest tasks there. Be concrete.\n\n` +
       `Respond with ONLY the JSON, no preamble.`
 
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
