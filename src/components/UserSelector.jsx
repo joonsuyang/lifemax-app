@@ -60,7 +60,7 @@ export default function UserSelector() {
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(o => !o)}
-            className="flex items-center gap-2.5 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:border-slate-600 transition-colors min-w-[160px]"
+            className="flex items-center gap-2.5 rounded-lg bg-slate-800 border border-slate-700 px-3 py-3 min-h-[44px] text-sm text-slate-300 hover:bg-slate-700 hover:border-slate-600 active:bg-slate-700 transition-colors min-w-[160px]"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
             <span className="flex-1 text-left truncate text-sm">
@@ -83,10 +83,10 @@ export default function UserSelector() {
                   <button
                     key={user.id}
                     onClick={() => handleSelect(user)}
-                    className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2.5 transition-colors ${
+                    className={`w-full text-left px-3 py-3 min-h-[44px] text-sm flex items-center gap-2.5 transition-colors ${
                       selectedUser?.id === user.id
                         ? 'text-indigo-300 bg-slate-700'
-                        : 'text-slate-300 hover:bg-slate-700 hover:text-slate-100'
+                        : 'text-slate-300 hover:bg-slate-700 hover:text-slate-100 active:bg-slate-700 active:text-slate-100'
                     }`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
@@ -103,7 +103,7 @@ export default function UserSelector() {
         {/* New User button */}
         <button
           onClick={() => { setModalOpen(true); setDropdownOpen(false) }}
-          className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-700 px-3 py-2 text-sm text-slate-500 hover:border-indigo-500/60 hover:text-indigo-400 hover:bg-slate-800 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-700 px-3 py-3 min-h-[44px] text-sm text-slate-500 hover:border-indigo-500/60 hover:text-indigo-400 hover:bg-slate-800 active:text-indigo-400 active:bg-slate-800 transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />

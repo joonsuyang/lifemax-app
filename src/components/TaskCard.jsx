@@ -13,22 +13,25 @@ const PRIORITY_DOT = {
 }
 
 export default function TaskCard({ task, onClick }) {
-  const badge  = PRIORITY_BADGE[task.priority]  ?? 'bg-slate-100 text-slate-500 border-slate-200'
-  const dot    = PRIORITY_DOT[task.priority]    ?? 'bg-slate-400'
+  const badge = PRIORITY_BADGE[task.priority] ?? 'bg-slate-100 text-slate-500 border-slate-200'
+  const dot   = PRIORITY_DOT[task.priority]   ?? 'bg-slate-400'
 
   return (
     <div
       onClick={() => onClick?.(task)}
       className="
-        bg-white rounded-xl p-3.5 cursor-pointer select-none group
+        bg-white rounded-xl px-3.5 py-4 cursor-pointer select-none
         shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_8px_rgba(0,0,0,0.12)]
-        hover:shadow-[0_4px_20px_rgba(0,0,0,0.28)]
-        hover:-translate-y-0.5
-        transition-all duration-150
+        active:scale-95
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400
+        transition-transform duration-150
       "
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onClick?.(task)}
     >
       {/* Task name */}
-      <p className="text-sm font-medium text-slate-800 leading-snug mb-3 line-clamp-2 group-hover:text-slate-900 transition-colors">
+      <p className="text-sm font-medium text-slate-800 leading-snug mb-3 line-clamp-2">
         {task.name}
       </p>
 

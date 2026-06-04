@@ -30,7 +30,7 @@ function AppShell() {
           {selectedUser && (
             <button
               onClick={() => setModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-400 rounded-lg transition-colors"
+              className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-400 active:scale-95 rounded-lg transition-all"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -68,6 +68,19 @@ function AppShell() {
           </div>
         )}
       </main>
+
+      {/* FAB — mobile only, replaces nav button */}
+      {selectedUser && (
+        <button
+          onClick={() => setModalOpen(true)}
+          aria-label="New Task"
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-indigo-500 hover:bg-indigo-400 active:scale-95 text-white shadow-lg flex items-center justify-center md:hidden transition-all"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      )}
 
       <NewTaskModal
         isOpen={modalOpen}

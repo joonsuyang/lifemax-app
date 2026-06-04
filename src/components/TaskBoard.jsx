@@ -1,3 +1,4 @@
+import useBreakpoint from '../hooks/useBreakpoint'
 import TaskCard from './TaskCard'
 
 const COLUMNS = [
@@ -35,6 +36,8 @@ const COLUMNS = [
   },
 ]
 
+const MOBILE_ORDER = ['in_progress', 'today', 'backlog', 'done']
+
 function ColumnSkeleton() {
   return (
     <div className="flex flex-col gap-2.5 animate-pulse">
@@ -49,6 +52,12 @@ function ColumnSkeleton() {
 }
 
 export default function TaskBoard({ tasks = [], loading = false, error = null, onTaskClick }) {
+  const { isMobile } = useBreakpoint()
+
+  const orderedColumns = isMobile
+    ? MOBILE_ORDER.map(key => COLUMNS.find(c => c.key === key))
+    : COLUMNS
+
   const byStatus = COLUMNS.reduce((acc, col) => {
     acc[col.key] = tasks.filter(t => (t.status ?? 'backlog') === col.key)
     return acc
@@ -63,11 +72,11 @@ export default function TaskBoard({ tasks = [], loading = false, error = null, o
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
-      {COLUMNS.map(col => {
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pb-4">
+      {orderedColumns.map(col => {
         const columnTasks = byStatus[col.key]
         return (
-          <div key={col.key} className="flex-none w-72 flex flex-col">
+          <div key={col.key} className="flex flex-col">
 
             {/* Column header */}
             <div className="flex items-center gap-2 mb-3 px-1">
@@ -81,7 +90,7 @@ export default function TaskBoard({ tasks = [], loading = false, error = null, o
             </div>
 
             {/* Column body */}
-            <div className={`flex-1 rounded-2xl p-3 flex flex-col gap-2.5 min-h-[520px] ${col.bg}`}>
+            <div className={`flex-1 rounded-2xl p-3 flex flex-col gap-2.5 md:min-h-[520px] ${col.bg}`}>
               {loading ? (
                 <ColumnSkeleton />
               ) : columnTasks.length === 0 ? (
