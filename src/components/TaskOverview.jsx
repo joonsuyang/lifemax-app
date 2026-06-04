@@ -41,7 +41,7 @@ function getCutoff(range) {
 function processData(tasks, range) {
   const cutoff = getCutoff(range)
   const completed = tasks.filter(
-    t => t.status === 'done' && t.completed_at && new Date(t.completed_at) >= cutoff
+    t => t.status === 'done' && t.date_completed && new Date(t.date_completed) >= cutoff
   )
   const byCategory = {}
   completed.forEach(task => {

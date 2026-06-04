@@ -151,14 +151,14 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
   const handleStatusChange = (newStatus) => {
     const patch = { status: newStatus }
     if (newStatus === 'in_progress') {
-      if (!form.started_at) patch.started_at = new Date().toISOString()
+      if (!form.date_started) patch.date_started = new Date().toISOString()
       startTimer(form.estimated_time)
     } else {
       resetTimer()
     }
     if (newStatus === 'done') {
-      patch.completed_at = new Date().toISOString()
-      if (!form.started_at) patch.started_at = new Date().toISOString()
+      patch.date_completed = new Date().toISOString()
+      if (!form.date_started) patch.date_started = new Date().toISOString()
     }
     setForm(prev => ({ ...prev, ...patch }))
   }
@@ -176,13 +176,13 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
           name:            data.name.trim(),
           category:        data.category || null,
           estimated_time:  data.estimated_time || null,
-          energy_required: data.energy_required || null,
+          energy:          data.energy || null,
           priority:        data.priority || 'medium',
-          min_completion:  data.min_completion?.trim() || null,
+          minimum_completion:  data.minimum_completion?.trim() || null,
           next_action:     data.next_action?.trim() || null,
           status:          data.status,
-          started_at:      data.started_at ?? null,
-          completed_at:    data.completed_at ?? null,
+          date_started:      data.date_started ?? null,
+          date_completed:    data.date_completed ?? null,
         })
         .eq('id', data.id)
       if (err) throw err
@@ -200,8 +200,8 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
     const now = new Date().toISOString()
     saveTask({
       status:       'done',
-      completed_at: now,
-      started_at:   form.started_at ?? now,
+      date_completed: now,
+      date_started:   form.date_started ?? now,
     })
   }
 
@@ -333,7 +333,7 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
             </div>
             <div>
               <Label>Energy</Label>
-              <FieldSelect value={form.energy_required} onChange={v => set('energy_required', v)} options={ENERGY_OPTIONS} />
+              <FieldSelect value={form.energy} onChange={v => set('energy', v)} options={ENERGY_OPTIONS} />
             </div>
             <div>
               <Label>Priority</Label>
@@ -343,7 +343,7 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
 
           <div>
             <Label>Minimum completion</Label>
-            <FieldTextarea value={form.min_completion} onChange={v => set('min_completion', v)} placeholder="What counts as done" />
+            <FieldTextarea value={form.minimum_completion} onChange={v => set('minimum_completion', v)} placeholder="What counts as done" />
           </div>
 
           <div>
@@ -352,9 +352,9 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
           </div>
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 pt-1 border-t border-gray-50">
-            {form.created_at   && <span>Created {formatDate(form.created_at)}</span>}
-            {form.started_at   && <span>Started {formatDate(form.started_at)}</span>}
-            {form.completed_at && <span>Completed {formatDate(form.completed_at)}</span>}
+            {form.date_created && <span>Created {formatDate(form.date_created)}</span>}
+            {form.date_started   && <span>Started {formatDate(form.date_started)}</span>}
+            {form.date_completed && <span>Completed {formatDate(form.date_completed)}</span>}
           </div>
         </div>
 

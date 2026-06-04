@@ -14,7 +14,7 @@ export function useTasks(userId) {
       .from('tasks')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+      .order('date_created', { ascending: false })
     if (err) setError(err.message)
     else setTasks(data ?? [])
     setLoading(false)

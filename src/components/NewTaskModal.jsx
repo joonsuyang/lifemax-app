@@ -26,7 +26,7 @@ const COLUMNS = [
     width: 'min-w-[110px] w-[110px]',
   },
   {
-    key: 'energy_required',
+    key: 'energy',
     label: 'Energy',
     type: 'select',
     options: ENERGY_OPTIONS,
@@ -40,7 +40,7 @@ const COLUMNS = [
     width: 'min-w-[100px] w-[100px]',
   },
   {
-    key: 'min_completion',
+    key: 'minimum_completion',
     label: 'Min. completion',
     type: 'text',
     placeholder: 'What counts as done',
@@ -59,9 +59,9 @@ const EMPTY_ROW = {
   name: '',
   category: '',
   estimated_time: '',
-  energy_required: '',
+  energy: '',
   priority: '',
-  min_completion: '',
+  minimum_completion: '',
   next_action: '',
 }
 
@@ -100,9 +100,9 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
           name: r.name.trim(),
           category: r.category || null,
           estimated_time: r.estimated_time || null,
-          energy_required: r.energy_required || null,
+          energy: r.energy || null,
           priority: r.priority || 'medium',
-          min_completion: r.min_completion.trim() || null,
+          minimum_completion: r.minimum_completion.trim() || null,
           next_action: r.next_action.trim() || null,
         }))
       )
