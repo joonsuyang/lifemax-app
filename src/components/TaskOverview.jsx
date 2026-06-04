@@ -154,6 +154,26 @@ function SummaryCard({ summary, onNewTask, onRefresh, refreshing }) {
   )
 }
 
+// ── Weekly summary cache (localStorage, 1-hour TTL) ──────────────────────────
+
+const SUMMARY_TTL_MS = 60 * 60 * 1000
+
+function getCachedSummary(userId) {
+  try {
+    const raw = localStorage.getItem(`lifemax_summary_${userId}`)
+    if (!raw) return null
+    const { data, fetchedAt } = JSON.parse(raw)
+    if (Date.now() - fetchedAt > SUMMARY_TTL_MS) return null
+    return data
+  } catch { return null }
+}
+
+function setCachedSummary(userId, data) {
+  try {
+    localStorage.setItem(`lifemax_summary_${userId}`, JSON.stringify({ data, fetchedAt: Date.now() }))
+  } catch { /* storage quota — ignore */ }
+}
+
 // ── Tooltip ───────────────────────────────────────────────────────────────────
 
 function CustomTooltip({ active, payload }) {
@@ -179,8 +199,15 @@ export default function TaskOverview({ tasks, userId, onNewTask }) {
   const [weeklySummary, setWeeklySummary]   = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
 
-  const fetchSummary = useCallback(async () => {
+  const fetchSummary = useCallback(async (force = false) => {
     if (!userId) return
+
+    // Serve from cache unless forced or stale
+    if (!force) {
+      const cached = getCachedSummary(userId)
+      if (cached) { setWeeklySummary(cached); return }
+    }
+
     setSummaryLoading(true)
     try {
       const res = await fetch('/api/weekly-summary', {
@@ -191,11 +218,12 @@ export default function TaskOverview({ tasks, userId, onNewTask }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed')
       setWeeklySummary(data)
+      setCachedSummary(userId, data)
     } catch { /* silently fail — chart still renders */ }
     finally { setSummaryLoading(false) }
   }, [userId])
 
-  // Fetch on mount and when user changes
+  // On mount and user change: use cache if fresh, otherwise fetch
   useEffect(() => { fetchSummary() }, [fetchSummary])
 
   const data = useMemo(() => processData(tasks, range), [tasks, range])
@@ -251,7 +279,7 @@ export default function TaskOverview({ tasks, userId, onNewTask }) {
             <SummaryCard
               summary={weeklySummary}
               onNewTask={onNewTask}
-              onRefresh={fetchSummary}
+              onRefresh={() => fetchSummary(true)}
               refreshing={summaryLoading}
             />
           ) : null}

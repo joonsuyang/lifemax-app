@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import TextareaAutosize from 'react-textarea-autosize'
 import { supabase } from '../lib/supabase'
 import { CATEGORIES, TIME_OPTIONS, ENERGY_OPTIONS, PRIORITY_OPTIONS } from '../lib/filters'
 import useBreakpoint from '../hooks/useBreakpoint'
@@ -40,17 +41,17 @@ const SELECT_CLS = 'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-s
 function GhostTextCell({
   value, onChange, suggestion, onAccept, placeholder,
   onKeyDown: externalKeyDown,
-  isMobile = false, isTextarea = false, textareaRows = 2,
+  isMobile = false,
   wrapperCls = 'rounded-md border',
   inputCls   = 'w-full px-2 py-1.5 text-sm text-gray-700',
 }) {
   const showGhost = !value && Boolean(suggestion)
-  const Tag = isTextarea ? 'textarea' : 'input'
 
   const handleKeyDown = (e) => {
+    // Enter always inserts a newline — never triggers form submission
+    if (e.key === 'Enter') return
     if (showGhost) {
       if (e.key === 'Tab') {
-        // Accept; don't preventDefault so Tab still moves focus naturally
         onAccept(suggestion)
         return
       }
@@ -68,32 +69,26 @@ function GhostTextCell({
       className={`relative bg-white transition-colors focus-within:ring-1 focus-within:ring-indigo-400 focus-within:border-indigo-400 ${wrapperCls} ${showGhost ? 'border-indigo-200' : 'border-gray-200'}`}
       onClick={isMobile && showGhost ? () => onAccept(suggestion) : undefined}
     >
-      {/* Ghost text layer */}
+      {/* Ghost text — top-left aligned to match textarea text flow */}
       {showGhost && (
-        <div
-          aria-hidden
-          className={`absolute left-0 right-0 pointer-events-none overflow-hidden ${
-            isTextarea ? 'top-0 px-3 pt-2.5' : 'inset-0 flex items-center px-2'
-          }`}
-        >
-          <span className="text-sm text-gray-300 block truncate leading-snug pr-14">{suggestion}</span>
+        <div aria-hidden className="absolute inset-0 pointer-events-none overflow-hidden flex items-start px-2 pt-1.5">
+          <span className="text-sm text-gray-300 block leading-snug pr-14">{suggestion}</span>
         </div>
       )}
 
-      <Tag
-        {...(!isTextarea && { type: 'text' })}
-        {...(isTextarea && { rows: textareaRows })}
+      <TextareaAutosize
+        minRows={1}
+        maxRows={6}
         value={value}
         onChange={onChange}
         onKeyDown={handleKeyDown}
         placeholder={showGhost ? '' : placeholder}
-        className={`${inputCls} bg-transparent outline-none border-0 w-full`}
-        style={isTextarea ? undefined : undefined}
+        className={`${inputCls} bg-transparent outline-none border-0 w-full resize-none`}
       />
 
       {/* Hint badge */}
       {showGhost && (
-        <div className={`absolute pointer-events-none z-10 ${isTextarea ? 'top-1.5 right-1.5' : 'right-1.5 top-1/2 -translate-y-1/2'}`}>
+        <div className="absolute top-1.5 right-1.5 pointer-events-none z-10">
           <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap border ${
             isMobile
               ? 'bg-indigo-50 text-indigo-500 border-indigo-200'
@@ -408,13 +403,14 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess, initi
             {/* Name */}
             <div>
               <MobileLabel required>Task name</MobileLabel>
-              <input
-                type="text"
+              <TextareaAutosize
+                minRows={1}
+                maxRows={4}
                 value={mobileForm.name}
                 onChange={e => setMobileField('name', e.target.value)}
                 onBlur={() => suggestForMobile(mobileForm)}
                 placeholder="What do you need to do?"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
               />
             </div>
 
@@ -611,7 +607,7 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess, initi
                       const isAiSpinning      = isSuggesting && (col.key === 'minimum_completion' || col.key === 'next_action')
 
                       return (
-                        <td key={col.key} className="px-2 py-1.5">
+                        <td key={col.key} className="px-2 py-1.5 align-top">
                           {isAiSpinning ? (
                             <SpinnerCell />
                           ) : col.type === 'select' ? (
@@ -638,9 +634,7 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess, initi
                                   ? rowMeta[i].placeholder
                                   : col.placeholder
                               }
-                              onKeyDown={e => {
-                                if (e.key === 'Enter' && col.key === 'next_action' && i === rows.length - 1) handleDesktopSubmit()
-                              }}
+                              onKeyDown={undefined}
                               wrapperCls="rounded-md border"
                               inputCls="w-full px-2 py-1.5 text-sm text-gray-700"
                             />
