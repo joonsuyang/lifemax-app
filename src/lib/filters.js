@@ -13,20 +13,20 @@ export const CATEGORIES = [
 ]
 
 export const DEFAULT_FILTERS = {
-  time: false,
-  energy: false,
-  priority: false,
-  category: '',
-  created: '',
+  time:     '',   // '' | 'short'
+  energy:   '',   // '' | 'low' | 'medium' | 'high'
+  priority: '',   // '' | 'low' | 'medium' | 'high' | 'critical'
+  category: '',   // '' | category name
+  created:  '',   // '' | 'today' | 'this_week'
 }
 
 const SHORT_TIMES = ['10 min', '30 min']
 
 export function applyFilters(tasks, filters) {
   return tasks.filter(task => {
-    if (filters.time && !SHORT_TIMES.includes(task.estimated_time)) return false
-    if (filters.energy && task.energy?.toLowerCase() !== 'low') return false
-    if (filters.priority && task.priority?.toLowerCase() !== 'critical') return false
+    if (filters.time === 'short' && !SHORT_TIMES.includes(task.estimated_time)) return false
+    if (filters.energy   && task.energy?.toLowerCase()   !== filters.energy)   return false
+    if (filters.priority && task.priority?.toLowerCase() !== filters.priority) return false
     if (filters.category && task.category !== filters.category) return false
     if (filters.created) {
       const created = new Date(task.date_created)

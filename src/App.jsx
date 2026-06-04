@@ -23,50 +23,61 @@ function AppShell() {
     <div className="min-h-screen bg-slate-900 flex flex-col">
 
       {/* ── Header ── */}
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex items-center justify-between flex-shrink-0">
-        <UserSelector />
+      <header className="bg-slate-900 border-b border-slate-800 flex-shrink-0">
+        <div className="max-w-7xl mx-auto px-4 py-3.5 flex items-center relative">
 
-        <div className="flex items-center gap-4">
+          {/* Left: user selector */}
+          <UserSelector />
+
+          {/* Center: primary New Task button — desktop only, true center via absolute */}
           {selectedUser && (
-            <button
-              onClick={() => setModalOpen(true)}
-              className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-400 active:scale-95 rounded-lg transition-all"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
-              New Task
-            </button>
+            <div className="hidden md:flex absolute left-1/2 -translate-x-1/2">
+              <button
+                onClick={() => setModalOpen(true)}
+                className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-indigo-500 hover:bg-indigo-400 active:scale-95 rounded-xl shadow-md transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                New Task
+              </button>
+            </div>
           )}
-          <span className="text-[10px] font-light tracking-[0.35em] text-slate-500 uppercase select-none">
-            LifeMax
-          </span>
+
+          {/* Right: wordmark */}
+          <div className="ml-auto">
+            <span className="text-[10px] font-light tracking-[0.35em] text-slate-500 uppercase select-none">
+              LifeMax
+            </span>
+          </div>
         </div>
       </header>
 
       {/* ── Main ── */}
-      <main className="flex-1 p-6 overflow-y-auto">
-        {selectedUser ? (
-          <>
-            <FilterBar
-              filters={filters}
-              onChange={setFilters}
-              totalCount={tasks.length}
-              filteredCount={filteredTasks.length}
-            />
-            <TaskBoard
-              tasks={filteredTasks}
-              loading={loading}
-              error={error}
-              onTaskClick={setSelectedTask}
-            />
-            <TaskOverview tasks={tasks} />
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-64 gap-2 text-slate-600">
-            <p className="text-sm tracking-wide">Select or create a user to get started.</p>
-          </div>
-        )}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          {selectedUser ? (
+            <>
+              <FilterBar
+                filters={filters}
+                onChange={setFilters}
+                totalCount={tasks.length}
+                filteredCount={filteredTasks.length}
+              />
+              <TaskBoard
+                tasks={filteredTasks}
+                loading={loading}
+                error={error}
+                onTaskClick={setSelectedTask}
+              />
+              <TaskOverview tasks={tasks} />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 gap-2 text-slate-600">
+              <p className="text-sm tracking-wide">Select or create a user to get started.</p>
+            </div>
+          )}
+        </div>
       </main>
 
       {/* FAB — mobile only, replaces nav button */}
