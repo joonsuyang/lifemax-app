@@ -15,9 +15,20 @@ function AppShell() {
   const { tasks, loading, error, refreshTasks } = useTasks(selectedUser?.id)
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [modalOpen, setModalOpen] = useState(false)
+  const [newTaskInitialName, setNewTaskInitialName] = useState('')
   const [selectedTask, setSelectedTask] = useState(null)
 
   const filteredTasks = applyFilters(tasks, filters)
+
+  const handleOpenNewTask = (initialName = '') => {
+    setNewTaskInitialName(initialName)
+    setModalOpen(true)
+  }
+
+  const handleCloseNewTask = () => {
+    setModalOpen(false)
+    setNewTaskInitialName('')
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
@@ -26,14 +37,12 @@ function AppShell() {
       <header className="bg-slate-900 border-b border-slate-800 flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 py-3.5 flex items-center relative">
 
-          {/* Left: user selector */}
           <UserSelector />
 
-          {/* Center: primary New Task button — desktop only, true center via absolute */}
           {selectedUser && (
             <div className="hidden md:flex absolute left-1/2 -translate-x-1/2">
               <button
-                onClick={() => setModalOpen(true)}
+                onClick={() => handleOpenNewTask()}
                 className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-white bg-indigo-500 hover:bg-indigo-400 active:scale-95 rounded-xl shadow-md transition-all"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -44,9 +53,8 @@ function AppShell() {
             </div>
           )}
 
-          {/* Right: wordmark */}
           <div className="ml-auto">
-            <span className="text-[10px] font-light tracking-[0.35em] text-slate-500 uppercase select-none">
+            <span className="text-2xl md:text-3xl font-bold tracking-tight text-slate-100 select-none">
               LifeMax
             </span>
           </div>
@@ -70,7 +78,11 @@ function AppShell() {
                 error={error}
                 onTaskClick={setSelectedTask}
               />
-              <TaskOverview tasks={tasks} />
+              <TaskOverview
+                tasks={tasks}
+                userId={selectedUser.id}
+                onNewTask={handleOpenNewTask}
+              />
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 gap-2 text-slate-600">
@@ -80,10 +92,10 @@ function AppShell() {
         </div>
       </main>
 
-      {/* FAB — mobile only, replaces nav button */}
+      {/* FAB — mobile only */}
       {selectedUser && (
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={() => handleOpenNewTask()}
           aria-label="New Task"
           className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-indigo-500 hover:bg-indigo-400 active:scale-95 text-white shadow-lg flex items-center justify-center md:hidden transition-all"
         >
@@ -95,9 +107,10 @@ function AppShell() {
 
       <NewTaskModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={handleCloseNewTask}
         userId={selectedUser?.id}
         onSuccess={refreshTasks}
+        initialName={newTaskInitialName}
       />
 
       <TaskDetailModal

@@ -16,8 +16,16 @@ const TIME_TO_SECONDS = {
 // in_progress is no longer a selectable pill — managed by the Start button
 const SELECTABLE_STATUSES = [
   { value: 'backlog', label: 'Backlog' },
-  { value: 'today',   label: 'Today' },
+  { value: 'today',   label: 'To-Do Today' },
   { value: 'done',    label: 'Done' },
+]
+
+// All four statuses available as "Move to…" targets — current status is filtered out at render time
+const STATUS_MOVE_OPTIONS = [
+  { value: 'today',       label: 'To-Do Today' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'backlog',     label: 'Backlog' },
+  { value: 'done',        label: 'Done' },
 ]
 
 // Desktop (light modal)
@@ -282,6 +290,34 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
     }
   }
 
+  // ── Manual status move (power-user correction, outside timer flow) ───────────
+  const handleStatusMove = (newStatus) => {
+    const now = new Date().toISOString()
+    const overrides = { status: newStatus }
+
+    if (newStatus === 'in_progress' && !form.date_started) {
+      overrides.date_started = now
+    }
+    if (newStatus === 'done') {
+      overrides.date_completed = now
+      if (!form.date_started) overrides.date_started = now
+    }
+    // Reverting a completed task — clear the date so it exits the pie chart
+    if (form.status === 'done' && newStatus !== 'done') {
+      overrides.date_completed = null
+    }
+    // Stop the countdown when manually leaving in_progress
+    if (form.status === 'in_progress' && newStatus !== 'in_progress') {
+      resetTimer()
+    }
+
+    saveTask({
+      ...overrides,
+      // Preserve accumulated time — it's a historical fact, never reset it
+      ...(elapsedSeconds > 0 && { actual_time_spent_seconds: accumulatedTime }),
+    })
+  }
+
   // ── Timer derivations ────────────────────────────────────────────────────────
   const showTimer        = form.status === 'in_progress' && initialSecondsRef.current > 0
   const pct              = initialSecondsRef.current > 0 ? (timeLeft / initialSecondsRef.current) * 100 : 0
@@ -339,39 +375,50 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
 
         {/* Body */}
         {showTimer ? (
-          // Focus timer — large centered display
-          <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6">
-            {timerExpired ? (
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />
-                  <p className="text-xl font-semibold text-red-400">Time's up!</p>
-                </div>
-                <p className="text-sm text-slate-500">How did it go?</p>
-              </div>
-            ) : (
-              <>
-                <span className={`text-7xl font-bold font-mono tabular-nums leading-none ${mobileTimerColor}`}>
-                  {formatTime(timeLeft)}
-                </span>
-                <div className="w-full max-w-xs flex flex-col gap-2">
-                  <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${barColor}`}
-                      style={{ width: `${pct}%` }}
-                    />
+          // Focus timer — large centered display + Move To below
+          <div className="flex-1 flex flex-col pb-[140px]">
+            <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6">
+              {timerExpired ? (
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />
+                    <p className="text-xl font-semibold text-red-400">Time's up!</p>
                   </div>
-                  <p className="text-xs text-slate-600 text-center">{form.estimated_time}</p>
+                  <p className="text-sm text-slate-500">How did it go?</p>
                 </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <span className={`text-7xl font-bold font-mono tabular-nums leading-none ${mobileTimerColor}`}>
+                    {formatTime(timeLeft)}
+                  </span>
+                  <div className="w-full max-w-xs flex flex-col gap-2">
+                    <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${barColor}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-600 text-center">{form.estimated_time}</p>
+                  </div>
+                </>
+              )}
+              {accumulatedTime > 0 && (
+                <p className="text-xs text-slate-600">Time spent: {formatElapsed(accumulatedTime)}</p>
+              )}
+            </div>
 
-            {/* Time spent */}
-            {accumulatedTime > 0 && (
-              <p className="text-xs text-slate-600">
-                Time spent: {formatElapsed(accumulatedTime)}
-              </p>
-            )}
+            {/* Move to — secondary control */}
+            <div className="px-5 py-3 border-t border-slate-800/50">
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide mb-2">Move to</p>
+              <div className="flex flex-wrap gap-2">
+                {STATUS_MOVE_OPTIONS.filter(s => s.value !== form.status).map(s => (
+                  <button key={s.value} onClick={() => handleStatusMove(s.value)} disabled={saving}
+                    className="text-xs text-slate-500 hover:text-slate-300 border border-slate-700 hover:border-slate-600 active:scale-95 px-3 py-1.5 rounded-full transition-all disabled:opacity-50">
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           // Regular form — scrollable
@@ -429,6 +476,19 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
                 {form.date_completed && <span>Completed {formatDate(form.date_completed)}</span>}
               </div>
             </div>
+
+            {/* Move to — secondary control */}
+            <div className="pt-3 border-t border-slate-800/50">
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide mb-2">Move to</p>
+              <div className="flex flex-wrap gap-2">
+                {STATUS_MOVE_OPTIONS.filter(s => s.value !== form.status).map(s => (
+                  <button key={s.value} onClick={() => handleStatusMove(s.value)} disabled={saving}
+                    className="text-xs text-slate-500 hover:text-slate-300 border border-slate-700 hover:border-slate-600 active:scale-95 px-3 py-1.5 rounded-full transition-all disabled:opacity-50">
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -462,7 +522,7 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
                 </button>
                 <button onClick={handleRollover} disabled={saving}
                   className="w-full py-4 text-sm font-semibold text-slate-300 border border-slate-700 rounded-xl hover:bg-slate-800 disabled:opacity-60 transition-colors">
-                  {saving ? 'Saving…' : 'Rollover'}
+                  {saving ? 'Saving…' : 'Finish Later'}
                 </button>
               </>
             )
@@ -658,7 +718,7 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+        <div className="px-6 pt-4 pb-3 border-t border-gray-100 flex-shrink-0">
           {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
 
           {showTimer ? (
@@ -683,7 +743,7 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
                 <>
                   <button onClick={handleRollover} disabled={saving}
                     className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-60">
-                    {saving ? 'Saving…' : 'Rollover'}
+                    {saving ? 'Saving…' : 'Finish Later'}
                   </button>
                   <button onClick={handleComplete} disabled={saving}
                     className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-60 transition-colors">
@@ -733,6 +793,21 @@ export default function TaskDetailModal({ task, onClose, onSaved, onDeleted }) {
               </div>
             </div>
           )}
+
+          {/* Move to — secondary power-user control, always visible */}
+          <div className="flex items-center gap-x-2 gap-y-1 flex-wrap pt-3 mt-2 border-t border-gray-100">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mr-1">Move to</span>
+            {STATUS_MOVE_OPTIONS.filter(s => s.value !== form.status).map(s => (
+              <button
+                key={s.value}
+                onClick={() => handleStatusMove(s.value)}
+                disabled={saving}
+                className="text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded-md transition-colors disabled:opacity-50"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

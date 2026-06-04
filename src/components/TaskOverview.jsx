@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import useBreakpoint from '../hooks/useBreakpoint'
 
@@ -40,9 +40,7 @@ function getCutoff(range) {
 }
 
 function taskHours(task) {
-  if ((task.actual_time_spent_seconds ?? 0) > 0) {
-    return task.actual_time_spent_seconds / 3600
-  }
+  if ((task.actual_time_spent_seconds ?? 0) > 0) return task.actual_time_spent_seconds / 3600
   return TIME_TO_HOURS[task.estimated_time] ?? 0
 }
 
@@ -63,8 +61,97 @@ function processData(tasks, range) {
     .sort((a, b) => b.hours - a.hours)
 }
 
-function fmtHours(h) {
-  return `${h.toFixed(1)}h`
+function fmtHours(h) { return `${h.toFixed(1)}h` }
+
+// ── AI Summary sub-components ─────────────────────────────────────────────────
+
+function SparkleIcon() {
+  return (
+    <svg className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2l2.09 6.26L20 10l-5.91 1.74L12 18l-2.09-6.26L4 10l5.91-1.74L12 2z" />
+    </svg>
+  )
+}
+
+function RefreshIcon({ spinning }) {
+  return (
+    <svg
+      className={`w-3.5 h-3.5 transition-transform ${spinning ? 'animate-spin' : ''}`}
+      fill="none" viewBox="0 0 24 24" stroke="currentColor"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  )
+}
+
+function SummarySkeleton() {
+  return (
+    <div className="bg-slate-700/40 rounded-xl p-4 mb-5 animate-pulse">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-3.5 h-3.5 bg-slate-600 rounded-full" />
+        <div className="h-2.5 bg-slate-600 rounded w-16" />
+        <div className="h-2.5 bg-slate-700 rounded w-24 ml-1" />
+      </div>
+      <div className="space-y-2 mb-3">
+        <div className="h-3 bg-slate-600 rounded w-full" />
+        <div className="h-3 bg-slate-600 rounded w-4/5" />
+      </div>
+      <div className="flex gap-2">
+        <div className="h-6 bg-slate-600 rounded-full w-28" />
+        <div className="h-6 bg-slate-600 rounded-full w-24" />
+        <div className="h-6 bg-slate-600 rounded-full w-32" />
+      </div>
+    </div>
+  )
+}
+
+function SummaryCard({ summary, onNewTask, onRefresh, refreshing }) {
+  return (
+    <div className="bg-slate-700/40 rounded-xl p-4 mb-5">
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <SparkleIcon />
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.12em]">
+            AI Summary
+          </span>
+          <span className="text-[10px] text-slate-600">· Based on last 7 days</span>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={refreshing}
+          title="Regenerate summary"
+          className="text-slate-600 hover:text-slate-400 transition-colors disabled:opacity-40 flex-shrink-0 mt-0.5"
+        >
+          <RefreshIcon spinning={refreshing} />
+        </button>
+      </div>
+
+      {/* Summary text */}
+      <p className="text-sm text-slate-300 leading-relaxed mb-3">
+        {summary.summary}
+      </p>
+
+      {/* Suggestion pills */}
+      {summary.suggestions?.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-0.5">
+          {summary.suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => onNewTask(s)}
+              className="shrink-0 inline-flex items-center gap-1 text-xs px-3 py-1.5 bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 rounded-full hover:bg-indigo-500/25 hover:border-indigo-500/40 active:scale-95 transition-all"
+            >
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
@@ -84,16 +171,39 @@ function CustomTooltip({ active, payload }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function TaskOverview({ tasks }) {
+export default function TaskOverview({ tasks, userId, onNewTask }) {
   const [range, setRange] = useState('7d')
   const { isMobile } = useBreakpoint()
+
+  // Weekly AI summary — independent of the range filter
+  const [weeklySummary, setWeeklySummary]   = useState(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+
+  const fetchSummary = useCallback(async () => {
+    if (!userId) return
+    setSummaryLoading(true)
+    try {
+      const res = await fetch('/api/weekly-summary', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ user_id: userId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed')
+      setWeeklySummary(data)
+    } catch { /* silently fail — chart still renders */ }
+    finally { setSummaryLoading(false) }
+  }, [userId])
+
+  // Fetch on mount and when user changes
+  useEffect(() => { fetchSummary() }, [fetchSummary])
+
   const data = useMemo(() => processData(tasks, range), [tasks, range])
 
   const totalTasks = data.reduce((s, d) => s + d.count, 0)
   const totalHours = data.reduce((s, d) => s + d.hours, 0)
-  const isEmpty = data.length === 0
+  const isEmpty    = data.length === 0
 
-  // Smaller radii on mobile so the donut fits in a 160px container
   const innerRadius = isMobile ? 38 : 52
   const outerRadius = isMobile ? 62 : 82
 
@@ -130,8 +240,24 @@ export default function TaskOverview({ tasks }) {
         </div>
       </div>
 
-      {/* Scrollable body — max-h-[70vh] guards against extreme viewport overflow */}
+      {/* Scrollable body */}
       <div className="overflow-y-auto max-h-[70vh]">
+
+        {/* ── AI weekly summary card ── */}
+        <div className="px-4 pt-4 md:px-6">
+          {summaryLoading && !weeklySummary ? (
+            <SummarySkeleton />
+          ) : weeklySummary ? (
+            <SummaryCard
+              summary={weeklySummary}
+              onNewTask={onNewTask}
+              onRefresh={fetchSummary}
+              refreshing={summaryLoading}
+            />
+          ) : null}
+        </div>
+
+        {/* ── Chart + breakdown ── */}
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center py-14 gap-2 text-slate-600">
             <svg className="w-7 h-7 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,20 +267,15 @@ export default function TaskOverview({ tasks }) {
             <p className="text-sm tracking-wide">No completed tasks for this period.</p>
           </div>
         ) : (
-          /*
-           * Mobile:  flex-col — chart centered, legend stacked below
-           * Desktop: flex-row — chart left, legend right
-           */
-          <div className="flex flex-col items-center gap-6 px-4 py-6 md:flex-row md:items-center md:gap-10 md:px-6">
+          <div className="flex flex-col items-center gap-6 px-4 py-4 md:flex-row md:items-center md:gap-10 md:px-6 md:py-6">
 
-            {/* Donut chart — smaller on mobile */}
+            {/* Donut */}
             <div className="relative flex-shrink-0 w-40 h-40 md:w-48 md:h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={data}
-                    cx="50%"
-                    cy="50%"
+                    cx="50%" cy="50%"
                     innerRadius={innerRadius}
                     outerRadius={outerRadius}
                     paddingAngle={data.length > 1 ? 2 : 0}
@@ -162,17 +283,12 @@ export default function TaskOverview({ tasks }) {
                     strokeWidth={0}
                   >
                     {data.map(entry => (
-                      <Cell
-                        key={entry.category}
-                        fill={CATEGORY_COLORS[entry.category] ?? FALLBACK_COLOR}
-                      />
+                      <Cell key={entry.category} fill={CATEGORY_COLORS[entry.category] ?? FALLBACK_COLOR} />
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
-
-              {/* Center label */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-xl font-light text-slate-100 leading-none tracking-tight md:text-2xl">
                   {fmtHours(totalHours)}
@@ -183,21 +299,16 @@ export default function TaskOverview({ tasks }) {
               </div>
             </div>
 
-            {/* Category legend — vertical stack on both mobile and desktop */}
+            {/* Category legend */}
             <div className="w-full flex flex-col gap-2.5 md:flex-1 md:min-w-0 md:gap-3">
               {data.map(d => {
                 const color = CATEGORY_COLORS[d.category] ?? FALLBACK_COLOR
-                const pct = totalHours > 0 ? (d.hours / totalHours) * 100 : 0
+                const pct   = totalHours > 0 ? (d.hours / totalHours) * 100 : 0
                 return (
                   <div key={d.category}>
                     <div className="flex items-center gap-2.5 mb-1">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ background: color }}
-                      />
-                      <span className="text-sm text-slate-300 capitalize flex-1 min-w-0 truncate">
-                        {d.category}
-                      </span>
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                      <span className="text-sm text-slate-300 capitalize flex-1 min-w-0 truncate">{d.category}</span>
                       <span className="text-xs text-slate-500 flex-shrink-0 tabular-nums whitespace-nowrap">
                         {d.count} task{d.count !== 1 ? 's' : ''}
                       </span>
@@ -215,12 +326,9 @@ export default function TaskOverview({ tasks }) {
                 )
               })}
 
-              {/* Total row */}
               <div className="flex items-center gap-2.5 pt-3 border-t border-slate-700/50">
                 <span className="w-2.5 h-2.5 flex-shrink-0" />
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex-1">
-                  Total
-                </span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex-1">Total</span>
                 <span className="text-xs text-slate-500 flex-shrink-0 tabular-nums whitespace-nowrap">
                   {totalTasks} task{totalTasks !== 1 ? 's' : ''}
                 </span>

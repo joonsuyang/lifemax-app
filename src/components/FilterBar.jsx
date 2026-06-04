@@ -20,8 +20,8 @@ const PRIORITY_FILTER_OPTIONS = [
 ]
 
 const CREATED_FILTER_OPTIONS = [
-  { value: 'today',     label: 'Today' },
-  { value: 'this_week', label: 'This Week' },
+  { value: 'today',     label: 'Created Today' },
+  { value: 'this_week', label: 'Created This Week' },
 ]
 
 const CATEGORY_FILTER_OPTIONS = CATEGORIES.map(c => ({
@@ -87,7 +87,7 @@ export default function FilterBar({ filters, onChange, totalCount, filteredCount
         <FilterSelect
           value={filters.time}
           onChange={v => set('time', v)}
-          allLabel="All Time Buckets"
+          allLabel="All Task Times"
           options={TIME_FILTER_OPTIONS}
         />
 
@@ -117,7 +117,7 @@ export default function FilterBar({ filters, onChange, totalCount, filteredCount
         <FilterSelect
           value={filters.created}
           onChange={v => set('created', v)}
-          allLabel="All Time"
+          allLabel="All Creation Dates"
           options={CREATED_FILTER_OPTIONS}
         />
 

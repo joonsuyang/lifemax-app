@@ -3,16 +3,8 @@ import TaskCard from './TaskCard'
 
 const COLUMNS = [
   {
-    key: 'backlog',
-    label: 'Backlog',
-    labelColor: 'text-slate-400',
-    countStyle: 'bg-slate-700/80 text-slate-400',
-    dot: 'bg-slate-500',
-    bg: 'bg-slate-800/50',
-  },
-  {
     key: 'today',
-    label: 'Today',
+    label: 'To-Do Today',
     labelColor: 'text-blue-400',
     countStyle: 'bg-blue-950/80 text-blue-400',
     dot: 'bg-blue-400',
@@ -27,6 +19,14 @@ const COLUMNS = [
     bg: 'bg-amber-950/30',
   },
   {
+    key: 'backlog',
+    label: 'Backlog',
+    labelColor: 'text-slate-400',
+    countStyle: 'bg-slate-700/80 text-slate-400',
+    dot: 'bg-slate-500',
+    bg: 'bg-slate-800/50',
+  },
+  {
     key: 'done',
     label: 'Done',
     labelColor: 'text-emerald-400',
@@ -36,7 +36,7 @@ const COLUMNS = [
   },
 ]
 
-const MOBILE_ORDER = ['in_progress', 'today', 'backlog', 'done']
+const MOBILE_ORDER = ['today', 'in_progress', 'backlog', 'done']
 
 function ColumnSkeleton() {
   return (

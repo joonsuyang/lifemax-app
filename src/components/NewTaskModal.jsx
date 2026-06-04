@@ -4,7 +4,7 @@ import { CATEGORIES, TIME_OPTIONS, ENERGY_OPTIONS, PRIORITY_OPTIONS } from '../l
 import useBreakpoint from '../hooks/useBreakpoint'
 import { computeSuggestions } from '../lib/taskSuggestions'
 
-// ── Desktop table column definitions ────────────────────────────────────────
+// ── Column definitions ────────────────────────────────────────────────────────
 
 const COLUMNS = [
   { key: 'name',               label: 'Task name',       required: true, type: 'text',   placeholder: 'Task name',           width: 'min-w-[220px] w-[220px]' },
@@ -16,27 +16,133 @@ const COLUMNS = [
   { key: 'next_action',        label: 'Next action',                     type: 'text',   placeholder: 'First concrete step', width: 'min-w-[200px] w-[200px]' },
 ]
 
-const EMPTY_ROW = {
-  name: '', category: '', estimated_time: '', energy: '',
-  priority: '', minimum_completion: '', next_action: '',
-}
-
+const EMPTY_ROW = { name: '', category: '', estimated_time: '', energy: '', priority: '', minimum_completion: '', next_action: '' }
 const makeRows = (n) => Array.from({ length: n }, () => ({ ...EMPTY_ROW }))
-function cap(str) { return str.charAt(0).toUpperCase() + str.slice(1) }
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1) }
 
-// ── Mobile sub-components ────────────────────────────────────────────────────
+// ── Mobile helpers ────────────────────────────────────────────────────────────
 
 function MobileLabel({ children, required }) {
   return (
     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-      {children}
-      {required && <span className="text-red-400 ml-0.5">*</span>}
+      {children}{required && <span className="text-red-400 ml-0.5">*</span>}
     </p>
   )
 }
 
-const INPUT_CLS  = 'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
 const SELECT_CLS = 'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
+
+// ── Ghost text input (text + textarea) ───────────────────────────────────────
+// Renders an overlay of gray suggestion text behind a transparent input.
+// Tab or → (right arrow) on empty input accepts the suggestion.
+// On mobile, tapping the wrapper accepts it.
+
+function GhostTextCell({
+  value, onChange, suggestion, onAccept, placeholder,
+  onKeyDown: externalKeyDown,
+  isMobile = false, isTextarea = false, textareaRows = 2,
+  wrapperCls = 'rounded-md border',
+  inputCls   = 'w-full px-2 py-1.5 text-sm text-gray-700',
+}) {
+  const showGhost = !value && Boolean(suggestion)
+  const Tag = isTextarea ? 'textarea' : 'input'
+
+  const handleKeyDown = (e) => {
+    if (showGhost) {
+      if (e.key === 'Tab') {
+        // Accept; don't preventDefault so Tab still moves focus naturally
+        onAccept(suggestion)
+        return
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        onAccept(suggestion)
+        return
+      }
+    }
+    externalKeyDown?.(e)
+  }
+
+  return (
+    <div
+      className={`relative bg-white transition-colors focus-within:ring-1 focus-within:ring-indigo-400 focus-within:border-indigo-400 ${wrapperCls} ${showGhost ? 'border-indigo-200' : 'border-gray-200'}`}
+      onClick={isMobile && showGhost ? () => onAccept(suggestion) : undefined}
+    >
+      {/* Ghost text layer */}
+      {showGhost && (
+        <div
+          aria-hidden
+          className={`absolute left-0 right-0 pointer-events-none overflow-hidden ${
+            isTextarea ? 'top-0 px-3 pt-2.5' : 'inset-0 flex items-center px-2'
+          }`}
+        >
+          <span className="text-sm text-gray-300 block truncate leading-snug pr-14">{suggestion}</span>
+        </div>
+      )}
+
+      <Tag
+        {...(!isTextarea && { type: 'text' })}
+        {...(isTextarea && { rows: textareaRows })}
+        value={value}
+        onChange={onChange}
+        onKeyDown={handleKeyDown}
+        placeholder={showGhost ? '' : placeholder}
+        className={`${inputCls} bg-transparent outline-none border-0 w-full`}
+        style={isTextarea ? undefined : undefined}
+      />
+
+      {/* Hint badge */}
+      {showGhost && (
+        <div className={`absolute pointer-events-none z-10 ${isTextarea ? 'top-1.5 right-1.5' : 'right-1.5 top-1/2 -translate-y-1/2'}`}>
+          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap border ${
+            isMobile
+              ? 'bg-indigo-50 text-indigo-500 border-indigo-200'
+              : 'bg-slate-50 text-slate-400 border-slate-200'
+          }`}>
+            {isMobile ? 'Tap' : 'Tab ↹'}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Ghost select (native <select> with hint in the placeholder option) ────────
+// Empty option shows "↹ Fitness" when there's a ghost suggestion.
+// Tab while empty + suggestion → accepts.
+
+function GhostSelectCell({ value, onChange, ghostSuggestion, onAcceptGhost, options }) {
+  const showGhost = !value && Boolean(ghostSuggestion)
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      onKeyDown={e => {
+        if (showGhost && e.key === 'Tab') onAcceptGhost(ghostSuggestion)
+      }}
+      className={`w-full rounded-md border px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 transition-colors ${
+        showGhost ? 'border-indigo-200 text-indigo-400 italic' : 'border-gray-200 text-gray-700'
+      }`}
+    >
+      <option value="">{showGhost ? `↹ ${cap(ghostSuggestion)}` : '—'}</option>
+      {options.map(opt => <option key={opt} value={opt}>{cap(opt)}</option>)}
+    </select>
+  )
+}
+
+// ── Spinner cell (shown while AI is fetching) ─────────────────────────────────
+
+function SpinnerCell() {
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-indigo-400 italic">
+      <svg className="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+      </svg>
+      Suggesting…
+    </div>
+  )
+}
 
 // ── API helper ────────────────────────────────────────────────────────────────
 
@@ -52,29 +158,41 @@ async function fetchSuggestion(name, category, estimated_time) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
+export default function NewTaskModal({ isOpen, onClose, userId, onSuccess, initialName = '' }) {
   const { isMobile } = useBreakpoint()
 
-  // Desktop state
-  const [rows, setRows]                       = useState(makeRows(5))
-  const [suggestingRows, setSuggestingRows]   = useState(new Set())
-  // rowMeta[i] = { suggested: true, placeholder: 'hint string' }
-  const [rowMeta, setRowMeta]                 = useState({})
+  // Desktop
+  const [rows, setRows]                           = useState(makeRows(5))
+  const [suggestingRows, setSuggestingRows]       = useState(new Set())
+  // rowMeta[i] = { suggested, ghost: { name?, category?, estimated_time?, energy? }, placeholder }
+  const [rowMeta, setRowMeta]                     = useState({})
+  // AI ghost text for minimum_completion / next_action per row
+  const [aiGhostSuggestions, setAiGhostSuggestions] = useState({})
 
-  // Mobile state
-  const [mobileForm, setMobileForm]           = useState({ ...EMPTY_ROW })
-  const [suggesting, setSuggesting]           = useState(false)
+  // Mobile
+  const [mobileForm, setMobileForm]               = useState({ ...EMPTY_ROW })
+  const [suggesting, setSuggesting]               = useState(false)
+  const [mobileSuggestion, setMobileSuggestion]   = useState({ minimum_completion: '', next_action: '' })
 
   // Shared
-  const [submitting, setSubmitting]           = useState(false)
-  const [error, setError]                     = useState('')
+  const [submitting, setSubmitting]               = useState(false)
+  const [error, setError]                         = useState('')
 
-  // ── Load history-based suggestions on desktop open ───────────────────────────
+  // ── initialName: pre-fill from a suggestion pill click ──────────────────────
   useEffect(() => {
-    if (!isOpen || !userId) return
-    // Mobile uses bottom sheet — skip desktop prefill
-    if (window.innerWidth < 768) return
+    if (!isOpen || !initialName) return
+    if (isMobile) {
+      setMobileForm(prev => ({ ...prev, name: initialName }))
+    } else {
+      setRows(prev => prev.map((r, i) => i === 0 ? { ...r, name: initialName } : r))
+      setRowMeta(prev => { const n = { ...prev }; delete n[0]; return n })
+    }
+  }, [isOpen, initialName, isMobile])
 
+  // ── History-based ghost suggestions on desktop open ──────────────────────────
+  useEffect(() => {
+    if (!isOpen || !userId || window.innerWidth < 768) return
+    if (initialName) return // skip history prefill when opening with a preset name
     let cancelled = false
 
     async function load() {
@@ -87,7 +205,6 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
           .limit(30)
 
         if (cancelled || !data?.length) return
-
         const suggestions = computeSuggestions(data)
         if (!suggestions.length) return
 
@@ -95,21 +212,22 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
         const newMeta = {}
 
         suggestions.forEach((s, i) => {
-          newRows[i] = {
-            ...EMPTY_ROW,
-            category:       s.category       || '',
-            estimated_time: s.estimated_time  || '',
-            energy:         s.energy          || '',
-            name:           s.name            || '',
+          // Rows stay EMPTY — suggestions live in rowMeta as ghost text
+          newRows[i] = { ...EMPTY_ROW }
+          newMeta[i] = {
+            suggested: true,
+            placeholder: s.placeholder || '',
+            ghost: {
+              ...(s.name           && { name:           s.name }),
+              ...(s.category       && { category:       s.category }),
+              ...(s.estimated_time && { estimated_time: s.estimated_time }),
+              ...(s.energy         && { energy:         s.energy }),
+            },
           }
-          newMeta[i] = { suggested: true, placeholder: s.placeholder || '' }
         })
 
-        if (!cancelled) {
-          setRows(newRows)
-          setRowMeta(newMeta)
-        }
-      } catch { /* silently fall back to empty rows */ }
+        if (!cancelled) { setRows(newRows); setRowMeta(newMeta) }
+      } catch { /* fall back to empty rows */ }
     }
 
     load()
@@ -123,28 +241,52 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
 
   const update = (i, field, value) => {
     setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
-    // User editing the name clears the "suggested" status for that row
+    // Editing the name dismisses the entire "suggested" row status
     if (field === 'name') {
-      setRowMeta(prev => {
-        if (!prev[i]?.suggested) return prev
-        const next = { ...prev }
-        delete next[i]
-        return next
-      })
+      setRowMeta(prev => { if (!prev[i]?.suggested) return prev; const n = { ...prev }; delete n[i]; return n })
+      setAiGhostSuggestions(prev => { if (!prev[i]) return prev; const n = { ...prev }; delete n[i]; return n })
     }
+  }
+
+  // Accept a history ghost suggestion (name / category / estimated_time / energy)
+  const acceptHistoryGhost = (rowIndex, field, value) => {
+    update(rowIndex, field, value)
+    setRowMeta(prev => {
+      if (!prev[rowIndex]?.ghost) return prev
+      const next = { ...prev }
+      const ghost = { ...next[rowIndex].ghost }
+      delete ghost[field]
+      next[rowIndex] = { ...next[rowIndex], ghost }
+      return next
+    })
+  }
+
+  // Accept an AI ghost suggestion (minimum_completion / next_action)
+  const acceptAiGhost = (rowIndex, field, value) => {
+    update(rowIndex, field, value)
+    setAiGhostSuggestions(prev => {
+      if (!prev[rowIndex]) return prev
+      const next = { ...prev }
+      const row = { ...next[rowIndex] }
+      delete row[field]
+      next[rowIndex] = row
+      return next
+    })
   }
 
   const handleClose = () => {
     setRows(makeRows(5))
     setRowMeta({})
+    setAiGhostSuggestions({})
     setMobileForm({ ...EMPTY_ROW })
+    setMobileSuggestion({ minimum_completion: '', next_action: '' })
     setSuggestingRows(new Set())
     setSuggesting(false)
     setError('')
     onClose()
   }
 
-  // ── AI suggestion: mobile ────────────────────────────────────────────────────
+  // ── AI suggestion: mobile → ghost text (not direct prefill) ──────────────────
   const suggestForMobile = async (formSnap) => {
     if (!formSnap.name.trim() || !formSnap.estimated_time) return
     if (formSnap.minimum_completion.trim() && formSnap.next_action.trim()) return
@@ -153,29 +295,33 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
       const { minimum_completion, next_action } = await fetchSuggestion(
         formSnap.name.trim(), formSnap.category, formSnap.estimated_time
       )
-      setMobileForm(prev => ({
-        ...prev,
-        minimum_completion: prev.minimum_completion.trim() ? prev.minimum_completion : (minimum_completion ?? ''),
-        next_action:        prev.next_action.trim()        ? prev.next_action        : (next_action        ?? ''),
+      setMobileSuggestion(prev => ({
+        minimum_completion: formSnap.minimum_completion.trim() ? prev.minimum_completion : (minimum_completion ?? ''),
+        next_action:        formSnap.next_action.trim()        ? prev.next_action        : (next_action        ?? ''),
       }))
     } catch { }
     finally { setSuggesting(false) }
   }
 
-  // ── AI suggestion: desktop row ───────────────────────────────────────────────
+  // ── AI suggestion: desktop row → ghost text (not direct prefill) ─────────────
   const suggestForRow = async (rowIndex, rowSnap) => {
     if (suggestingRows.has(rowIndex)) return
     if (!rowSnap.name.trim() || !rowSnap.estimated_time) return
     if (rowSnap.minimum_completion.trim() && rowSnap.next_action.trim()) return
+    const existing = aiGhostSuggestions[rowIndex]
+    if (existing?.minimum_completion && existing?.next_action) return
+
     setSuggestingRows(prev => new Set([...prev, rowIndex]))
     try {
       const { minimum_completion, next_action } = await fetchSuggestion(
         rowSnap.name.trim(), rowSnap.category, rowSnap.estimated_time
       )
-      setRows(prev => prev.map((r, i) => i !== rowIndex ? r : {
-        ...r,
-        minimum_completion: r.minimum_completion.trim() ? r.minimum_completion : (minimum_completion ?? ''),
-        next_action:        r.next_action.trim()        ? r.next_action        : (next_action        ?? ''),
+      setAiGhostSuggestions(prev => ({
+        ...prev,
+        [rowIndex]: {
+          minimum_completion: rowSnap.minimum_completion.trim() ? undefined : minimum_completion,
+          next_action:        rowSnap.next_action.trim()        ? undefined : next_action,
+        },
       }))
     } catch { }
     finally {
@@ -259,6 +405,7 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
           </div>
 
           <div className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-4">
+            {/* Name */}
             <div>
               <MobileLabel required>Task name</MobileLabel>
               <input
@@ -267,10 +414,11 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
                 onChange={e => setMobileField('name', e.target.value)}
                 onBlur={() => suggestForMobile(mobileForm)}
                 placeholder="What do you need to do?"
-                className={INPUT_CLS}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
 
+            {/* 2-col selects */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <MobileLabel>Category</MobileLabel>
@@ -310,6 +458,7 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
               </div>
             </div>
 
+            {/* Suggesting indicator */}
             {suggesting && (
               <div className="flex items-center gap-1.5 text-xs text-indigo-400">
                 <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -320,25 +469,49 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
               </div>
             )}
 
+            {/* Min completion — ghost text */}
             <div>
               <MobileLabel>Minimum completion</MobileLabel>
-              <textarea
+              <GhostTextCell
                 value={mobileForm.minimum_completion}
-                onChange={e => setMobileField('minimum_completion', e.target.value)}
-                placeholder={suggesting ? 'Generating suggestion…' : 'What counts as done'}
-                rows={2}
-                className={`${INPUT_CLS} resize-none`}
+                onChange={e => {
+                  setMobileField('minimum_completion', e.target.value)
+                  if (e.target.value) setMobileSuggestion(prev => ({ ...prev, minimum_completion: '' }))
+                }}
+                suggestion={mobileSuggestion.minimum_completion}
+                onAccept={val => {
+                  setMobileField('minimum_completion', val)
+                  setMobileSuggestion(prev => ({ ...prev, minimum_completion: '' }))
+                }}
+                placeholder="What counts as done"
+                isTextarea
+                textareaRows={2}
+                isMobile
+                wrapperCls="rounded-lg border"
+                inputCls="w-full px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400"
               />
             </div>
 
+            {/* Next action — ghost text */}
             <div>
               <MobileLabel>Next action</MobileLabel>
-              <textarea
+              <GhostTextCell
                 value={mobileForm.next_action}
-                onChange={e => setMobileField('next_action', e.target.value)}
-                placeholder={suggesting ? 'Generating suggestion…' : 'First concrete step'}
-                rows={2}
-                className={`${INPUT_CLS} resize-none`}
+                onChange={e => {
+                  setMobileField('next_action', e.target.value)
+                  if (e.target.value) setMobileSuggestion(prev => ({ ...prev, next_action: '' }))
+                }}
+                suggestion={mobileSuggestion.next_action}
+                onAccept={val => {
+                  setMobileField('next_action', val)
+                  setMobileSuggestion(prev => ({ ...prev, next_action: '' }))
+                }}
+                placeholder="First concrete step"
+                isTextarea
+                textareaRows={2}
+                isMobile
+                wrapperCls="rounded-lg border"
+                inputCls="w-full px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400"
               />
             </div>
           </div>
@@ -364,7 +537,7 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // DESKTOP — centered modal with history-prefilled rows
+  // DESKTOP — centered modal
   // ════════════════════════════════════════════════════════════════════════════
   if (!isOpen) return null
 
@@ -380,7 +553,7 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
           <div>
             <h2 className="text-base font-semibold text-gray-900">New Tasks</h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              Prefilled from your history — edit or clear any row. Empty rows are skipped.
+              Suggestions in gray — Tab or → to accept. Empty rows are skipped.
             </p>
           </div>
           <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 transition-colors mt-0.5">
@@ -397,8 +570,7 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
                 <th className="w-12 px-3 py-2.5" />
                 {COLUMNS.map(col => (
                   <th key={col.key} className={`px-2 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide ${col.width}`}>
-                    {col.label}
-                    {col.required && <span className="text-red-400 ml-0.5">*</span>}
+                    {col.label}{col.required && <span className="text-red-400 ml-0.5">*</span>}
                   </th>
                 ))}
               </tr>
@@ -406,9 +578,10 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
             <tbody>
               {rows.map((row, i) => {
                 const hasName      = Boolean(row.name.trim())
-                const isSuggested  = rowMeta[i]?.suggested && !hasName
+                const isSuggested  = Boolean(rowMeta[i]?.suggested) && !hasName
                 const isSuggesting = suggestingRows.has(i)
-                const hintText     = rowMeta[i]?.placeholder || ''
+                const ghost        = rowMeta[i]?.ghost ?? {}
+                const aiGhost      = aiGhostSuggestions[i] ?? {}
 
                 return (
                   <tr
@@ -419,7 +592,7 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
                                     'hover:bg-gray-50/60'
                     }`}
                   >
-                    {/* Row number + suggested badge */}
+                    {/* Row number + badge */}
                     <td className="px-3 py-2 text-right select-none">
                       <div className="flex flex-col items-end gap-0.5">
                         <span className="text-xs text-gray-300">{i + 1}</span>
@@ -431,61 +604,50 @@ export default function NewTaskModal({ isOpen, onClose, userId, onSuccess }) {
                       </div>
                     </td>
 
-                    {COLUMNS.map(col => (
-                      <td key={col.key} className="px-2 py-1.5">
-                        {/* Spinner while AI is generating min_completion / next_action */}
-                        {isSuggesting && (col.key === 'minimum_completion' || col.key === 'next_action') ? (
-                          <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-indigo-400 italic">
-                            <svg className="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
-                            </svg>
-                            Suggesting…
-                          </div>
-                        ) : col.type === 'select' ? (
-                          <select
-                            value={row[col.key]}
-                            onChange={e => {
-                              const val = e.target.value
-                              update(i, col.key, val)
-                              if (col.key === 'estimated_time') {
-                                suggestForRow(i, { ...row, estimated_time: val })
+                    {COLUMNS.map(col => {
+                      const historySuggestion = ghost[col.key] ?? null
+                      const aiSuggestion      = aiGhost[col.key] ?? null
+                      const suggestion        = historySuggestion || aiSuggestion
+                      const isAiSpinning      = isSuggesting && (col.key === 'minimum_completion' || col.key === 'next_action')
+
+                      return (
+                        <td key={col.key} className="px-2 py-1.5">
+                          {isAiSpinning ? (
+                            <SpinnerCell />
+                          ) : col.type === 'select' ? (
+                            <GhostSelectCell
+                              value={row[col.key]}
+                              onChange={val => {
+                                update(i, col.key, val)
+                                if (col.key === 'estimated_time') suggestForRow(i, { ...row, estimated_time: val })
+                              }}
+                              ghostSuggestion={historySuggestion}
+                              onAcceptGhost={val => acceptHistoryGhost(i, col.key, val)}
+                              options={col.options}
+                            />
+                          ) : (
+                            <GhostTextCell
+                              value={row[col.key]}
+                              onChange={e => update(i, col.key, e.target.value)}
+                              suggestion={suggestion}
+                              onAccept={val =>
+                                historySuggestion ? acceptHistoryGhost(i, col.key, val) : acceptAiGhost(i, col.key, val)
                               }
-                            }}
-                            className={`w-full rounded-md border px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 transition-colors ${
-                              isSuggested && row[col.key]
-                                ? 'border-indigo-200 text-indigo-700'
-                                : 'border-gray-200 text-gray-700'
-                            }`}
-                          >
-                            <option value="">—</option>
-                            {col.options.map(opt => <option key={opt} value={opt}>{cap(opt)}</option>)}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={row[col.key]}
-                            onChange={e => update(i, col.key, e.target.value)}
-                            placeholder={
-                              col.key === 'name' && hintText
-                                ? hintText
-                                : col.placeholder
-                            }
-                            onBlur={() => {
-                              if (col.key === 'name') suggestForRow(i, row)
-                            }}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter' && col.key === 'next_action' && i === rows.length - 1) handleDesktopSubmit()
-                            }}
-                            className={`w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 transition-colors ${
-                              col.key === 'name' && isSuggested && row[col.key]
-                                ? 'border-indigo-200 text-indigo-600 placeholder-indigo-300'
-                                : 'border-gray-200 text-gray-700 placeholder-gray-300'
-                            }`}
-                          />
-                        )}
-                      </td>
-                    ))}
+                              placeholder={
+                                col.key === 'name' && rowMeta[i]?.placeholder && !ghost.name
+                                  ? rowMeta[i].placeholder
+                                  : col.placeholder
+                              }
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' && col.key === 'next_action' && i === rows.length - 1) handleDesktopSubmit()
+                              }}
+                              wrapperCls="rounded-md border"
+                              inputCls="w-full px-2 py-1.5 text-sm text-gray-700"
+                            />
+                          )}
+                        </td>
+                      )
+                    })}
                   </tr>
                 )
               })}
