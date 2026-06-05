@@ -1,6 +1,25 @@
 import useBreakpoint from '../hooks/useBreakpoint'
 import TaskCard from './TaskCard'
 
+const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
+
+function sortColumn(tasks, colKey) {
+  return [...tasks].sort((a, b) => {
+    // Primary: priority descending (critical → low)
+    const pa = PRIORITY_ORDER[a.priority] ?? 4
+    const pb = PRIORITY_ORDER[b.priority] ?? 4
+    if (pa !== pb) return pa - pb
+
+    // Secondary: date-based tiebreak
+    if (colKey === 'done') {
+      // Most recently completed first
+      return new Date(b.date_completed ?? 0) - new Date(a.date_completed ?? 0)
+    }
+    // Oldest created first (surfaces long-standing tasks)
+    return new Date(a.date_created ?? 0) - new Date(b.date_created ?? 0)
+  })
+}
+
 const COLUMNS = [
   {
     key: 'today',
@@ -59,7 +78,8 @@ export default function TaskBoard({ tasks = [], loading = false, error = null, o
     : COLUMNS
 
   const byStatus = COLUMNS.reduce((acc, col) => {
-    acc[col.key] = tasks.filter(t => (t.status ?? 'backlog') === col.key)
+    const filtered = tasks.filter(t => (t.status ?? 'backlog') === col.key)
+    acc[col.key] = sortColumn(filtered, col.key)
     return acc
   }, {})
 
