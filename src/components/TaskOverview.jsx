@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import useBreakpoint from '../hooks/useBreakpoint'
+import { supabase } from '../lib/supabase'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ function SummarySkeleton() {
   )
 }
 
-function SummaryCard({ summary, onNewTask, onRefresh, refreshing }) {
+function SummaryCard({ summary, onSuggestionClick, loadingTaskId, onRefresh, refreshing }) {
   return (
     <div className="bg-slate-700/40 rounded-xl p-4 mb-5">
       {/* Header row */}
@@ -136,18 +137,48 @@ function SummaryCard({ summary, onNewTask, onRefresh, refreshing }) {
       {/* Suggestion pills */}
       {summary.suggestions?.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-0.5">
-          {summary.suggestions.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => onNewTask(s)}
-              className="shrink-0 inline-flex items-center gap-1 text-xs px-3 py-1.5 bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 rounded-full hover:bg-indigo-500/25 hover:border-indigo-500/40 active:scale-95 transition-all"
-            >
-              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
-              {s}
-            </button>
-          ))}
+          {summary.suggestions.map((s, i) => {
+            const label     = typeof s === 'string' ? s : (s.text ?? '')
+            const isReopen  = typeof s === 'object' && Boolean(s.existing_task_id)
+            const taskId    = isReopen ? s.existing_task_id : null
+            const taskName  = isReopen ? (s.existing_task_name ?? label) : null
+            const isLoading = Boolean(taskId && loadingTaskId === taskId)
+
+            return (
+              <button
+                key={i}
+                onClick={() => onSuggestionClick(s)}
+                disabled={Boolean(loadingTaskId)}
+                title={isReopen ? `Open existing task: ${taskName}` : undefined}
+                className={`shrink-0 inline-flex items-center gap-1 text-xs px-3 py-1.5 border rounded-full transition-all
+                  disabled:opacity-60 disabled:cursor-wait active:scale-95
+                  ${isReopen
+                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/25 hover:bg-amber-500/20 hover:border-amber-500/40'
+                    : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25 hover:bg-indigo-500/25 hover:border-indigo-500/40'
+                  }`}
+              >
+                {isLoading ? (
+                  // Spinner while fetching the task
+                  <svg className="w-3 h-3 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                  </svg>
+                ) : isReopen ? (
+                  // Reopen icon — circular arrow
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                ) : (
+                  // New task icon — plus
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                )}
+                {label}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
@@ -191,13 +222,14 @@ function CustomTooltip({ active, payload }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function TaskOverview({ tasks, userId, onNewTask }) {
+export default function TaskOverview({ tasks, userId, onNewTask, onOpenTask }) {
   const [range, setRange] = useState('7d')
   const { isMobile } = useBreakpoint()
 
   // Weekly AI summary — independent of the range filter
   const [weeklySummary, setWeeklySummary]   = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
+  const [loadingTaskId, setLoadingTaskId]   = useState(null)
 
   const fetchSummary = useCallback(async (force = false) => {
     if (!userId) return
@@ -225,6 +257,32 @@ export default function TaskOverview({ tasks, userId, onNewTask }) {
 
   // On mount and user change: use cache if fresh, otherwise fetch
   useEffect(() => { fetchSummary() }, [fetchSummary])
+
+  // Handle suggestion pill click — route to TaskDetailModal (reopen) or NewTaskModal (new)
+  const handleSuggestionClick = useCallback(async (s) => {
+    const label  = typeof s === 'string' ? s : (s.text ?? '')
+    const taskId = typeof s === 'object' ? (s.existing_task_id ?? null) : null
+
+    if (taskId && onOpenTask) {
+      setLoadingTaskId(taskId)
+      try {
+        const { data, error } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('id', taskId)
+          .single()
+        if (error || !data) throw new Error('Task not found')
+        onOpenTask(data)
+      } catch {
+        // Task deleted since summary was generated — fall back to creating a new one
+        onNewTask(label)
+      } finally {
+        setLoadingTaskId(null)
+      }
+    } else {
+      onNewTask(label)
+    }
+  }, [onOpenTask, onNewTask])
 
   const data = useMemo(() => processData(tasks, range), [tasks, range])
 
@@ -278,7 +336,8 @@ export default function TaskOverview({ tasks, userId, onNewTask }) {
           ) : weeklySummary ? (
             <SummaryCard
               summary={weeklySummary}
-              onNewTask={onNewTask}
+              onSuggestionClick={handleSuggestionClick}
+              loadingTaskId={loadingTaskId}
               onRefresh={() => fetchSummary(true)}
               refreshing={summaryLoading}
             />

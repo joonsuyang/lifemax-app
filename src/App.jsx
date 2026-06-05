@@ -82,6 +82,7 @@ function AppShell() {
                 tasks={tasks}
                 userId={selectedUser.id}
                 onNewTask={handleOpenNewTask}
+                onOpenTask={setSelectedTask}
               />
             </>
           ) : (

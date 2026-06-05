@@ -109,19 +109,31 @@ export default function TaskBoard({ tasks = [], loading = false, error = null, o
               </span>
             </div>
 
-            {/* Column body */}
-            <div className={`flex-1 rounded-2xl p-3 flex flex-col gap-2.5 md:min-h-[520px] ${col.bg}`}>
-              {loading ? (
-                <ColumnSkeleton />
-              ) : columnTasks.length === 0 ? (
-                <p className="text-xs text-slate-600 text-center pt-8 tracking-wide">
-                  No tasks
-                </p>
-              ) : (
-                columnTasks.map(task => (
-                  <TaskCard key={task.id} task={task} onClick={onTaskClick} />
-                ))
-              )}
+            {/* Column body — outer shell keeps bg/rounding; inner div is the scroll viewport */}
+            <div className={`rounded-2xl ${col.bg}`}>
+              <div
+                className={[
+                  'p-3 flex flex-col gap-2.5',
+                  // Desktop: cap at 600px (~5–6 tiles), scroll within column
+                  'md:max-h-[600px] md:overflow-y-auto md:pr-1',
+                  // Mobile: only add internal scroll when the list is long
+                  isMobile && columnTasks.length > 8
+                    ? 'max-h-[500px] overflow-y-auto pr-1'
+                    : '',
+                ].filter(Boolean).join(' ')}
+              >
+                {loading ? (
+                  <ColumnSkeleton />
+                ) : columnTasks.length === 0 ? (
+                  <p className="text-xs text-slate-600 text-center py-8 tracking-wide">
+                    No tasks
+                  </p>
+                ) : (
+                  columnTasks.map(task => (
+                    <TaskCard key={task.id} task={task} onClick={onTaskClick} />
+                  ))
+                )}
+              </div>
             </div>
           </div>
         )
