@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { UserProvider, useUser } from './context/UserContext'
 import { useTasks } from './hooks/useTasks'
 import { DEFAULT_FILTERS, applyFilters } from './lib/filters'
@@ -20,15 +20,18 @@ function AppShell() {
 
   const filteredTasks = applyFilters(tasks, filters)
 
-  const handleOpenNewTask = (initialName = '') => {
+  // Stable references — required so TaskOverview's useCallback deps don't change
+  // every render, which would cause handleSuggestionClick to re-close over a
+  // stale onNewTask reference (visible as a bug after async fetches on mobile).
+  const handleOpenNewTask = useCallback((initialName = '') => {
     setNewTaskInitialName(initialName)
     setModalOpen(true)
-  }
+  }, [])
 
-  const handleCloseNewTask = () => {
+  const handleCloseNewTask = useCallback(() => {
     setModalOpen(false)
     setNewTaskInitialName('')
-  }
+  }, [])
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">

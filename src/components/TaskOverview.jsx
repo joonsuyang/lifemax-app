@@ -258,7 +258,10 @@ export default function TaskOverview({ tasks, userId, onNewTask, onOpenTask }) {
   // On mount and user change: use cache if fresh, otherwise fetch
   useEffect(() => { fetchSummary() }, [fetchSummary])
 
-  // Handle suggestion pill click — route to TaskDetailModal (reopen) or NewTaskModal (new)
+  // Handle suggestion pill click — routes to TaskDetailModal (reopen) or NewTaskModal (new).
+  // Both onOpenTask (setSelectedTask) and onNewTask (handleOpenNewTask) are stable
+  // useCallback refs from App.jsx — required so this closure doesn't go stale after
+  // the async fetch on mobile.
   const handleSuggestionClick = useCallback(async (s) => {
     const label  = typeof s === 'string' ? s : (s.text ?? '')
     const taskId = typeof s === 'object' ? (s.existing_task_id ?? null) : null
@@ -271,9 +274,15 @@ export default function TaskOverview({ tasks, userId, onNewTask, onOpenTask }) {
           .select('*')
           .eq('id', taskId)
           .single()
-        if (error || !data) throw new Error('Task not found')
+
+        if (error || !data) {
+          console.error('[WeeklySummary] fetch task failed:', error?.message ?? 'no data returned', { taskId })
+          throw new Error(error?.message ?? 'Task not found')
+        }
+
         onOpenTask(data)
-      } catch {
+      } catch (err) {
+        console.error('[WeeklySummary] falling back to new-task flow:', err.message)
         // Task deleted since summary was generated — fall back to creating a new one
         onNewTask(label)
       } finally {
